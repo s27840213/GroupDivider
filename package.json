@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy-gh": "gh-pages -d dist"
   },
   "dependencies": {
     "@volar/vue-language-plugin-pug": "^1.2.0",
+    "gh-pages": "^5.0.0",
     "vue": "^3.2.45",
     "vue-eslint-parser": "^9.1.0"
   },
