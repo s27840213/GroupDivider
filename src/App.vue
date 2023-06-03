@@ -2,13 +2,23 @@
 div(class="main-section")
   div(class="group-section")
     div(v-for="(group, index) in groups" :key="index" class="group")
-      div(class="group__title") {{ `Group ${letter[index]} (${getGroupScore(group)})` }}
+      div(class="group__title") {{ `Group ${letter[index]}${showAverageScore ? `(${getGroupScore(group)})` : ''}` }}
+      //- transition(name="fade-in")
+        //- div(v-if="!isDeviding" class="group__players")
+        //-   div(v-for="player in group" :key="player.name")
+        //-     span {{ `${player.graduation_year} ${player.name}` }}
+        //-     span(:style="{ color: player.gender === 'M' ? 'blue' : 'red' }") {{ `(${player.gender})` }}
       div(class="group__players")
-        div(v-for="player in group" :key="player.name")
-          span {{ `${player.graduation_year} ${player.name}` }}
-          span(:style="{ color: player.gender === 'M' ? 'blue' : 'red' }") {{ `(${player.gender})` }}
+        transition-group(name="fade-in")
+          div(
+            v-for="(player, pIndex) in group"
+            :key="player.name"
+            :style="{ transitionDelay: isDeviding ? '0s' : `${pIndex * 0.2}s` }"
+          )
+            span {{ `${player.graduation_year} ${player.name}` }}
+            span(:style="{ color: player.gender === 'M' ? 'blue' : 'red' }") {{ `(${player.gender})` }}
   div(class="group-section__ctrl")
-    button(@click="divideArrayIntoSixGroups()") 隨機分組
+    button(@click="divideArrayIntoSixGroups()") {{ isDeviding ? `分組計算中${getAnimationDots}` : '隨機分組' }}
     div
       span 標準差限制 {{ standardDeviationLimit }}
       input(
@@ -18,6 +28,9 @@ div(class="main-section")
         max="0.6"
         step="0.01"
       )
+    div
+      span 是否顯示平均分數
+      toggle-btn(v-model="showAverageScore" :width="40")
 div(class="player-section")
   div(class="player-section__player-num") 未分組人數: {{ playersData.length }}
   div(v-for="player in playersData" :key="player.name" class="player-section__player")
@@ -27,7 +40,8 @@ div(class="player-section")
 
 <script setup lang="ts">
 import _playersData from '@/assets/players/playersData.json'
-import { reactive, ref } from 'vue'
+import ToggleBtn from '@/components/ToggleBtn.vue'
+import { computed, reactive, ref, watch } from 'vue'
 
 /** start of static data and interface */
 interface IPlayer {
@@ -63,6 +77,28 @@ let groups: Array<Array<IPlayer>> = reactive([])
 
 const standardDeviationLimit = ref(0.25)
 const isDeviding = ref(false)
+const showAverageScore = ref(false)
+
+const textAnimationState = ref(0)
+let textAnimationInterval = null as unknown as NodeJS.Timeout
+const getAnimationDots = computed(() => {
+  const dots = ['.', '..', '...']
+  return dots[textAnimationState.value]
+})
+
+watch(
+  () => isDeviding.value,
+  (newVal) => {
+    if (newVal) {
+      textAnimationInterval = setInterval(() => {
+        textAnimationState.value = (textAnimationState.value + 1) % 3
+      }, 500)
+    } else {
+      textAnimationState.value = 0
+      clearInterval(textAnimationInterval)
+    }
+  }
+)
 
 /** end of static data and interface */
 
@@ -79,19 +115,22 @@ function sortPlayerData() {
   // First Shuffle the array to randomize its order, this is particularly for people in same level
   playersData.sort(() => Math.random() - 0.5)
 
-  // comment this line if you want to sort truely randomly
-  // playersData.sort((a, b) => b.level - a.level)
-
   // Second, sort the array by gender
   playersData.sort((a, b) => {
     return a.gender === b.gender ? 0 : a.gender === 'M' ? -1 : 1
   })
 }
 
-function divideArrayIntoSixGroups() {
+async function divideArrayIntoSixGroups() {
   if (isDeviding.value) return
   isDeviding.value = true
   initData()
+
+  await new Promise((resolve) => {
+    setTimeout(() => {
+      resolve('')
+    }, 0)
+  })
   sortPlayerData()
   const startGroup = Math.floor(Math.random() * 6)
 
@@ -100,7 +139,7 @@ function divideArrayIntoSixGroups() {
     const targetGroupIndex = (startGroup + i) % groups.length
 
     // if the group has too many members in current stage(means this group has some member has same group_id)
-    // So we need to skip for a round, otherwise we will have some group has two mush members
+    // So we need to skip for a round, otherwise we will have some group has two much members
     if (skipCountMap.get(letter[targetGroupIndex]) !== 0) {
       skipCountMap.set(
         letter[targetGroupIndex],
@@ -125,7 +164,7 @@ function divideArrayIntoSixGroups() {
       playersData.splice(groupedPlayerIndex, 1)
       groups[targetGroupIndex].push(groupedPlayer)
 
-      // we need to skip for a round, otherwise we will have some group has too mush members
+      // we need to skip for a round, otherwise we will have some group has too much members
       // thus, we used a map to record how many times we need to skip
       skipCountMap.set(
         letter[targetGroupIndex],
@@ -164,6 +203,13 @@ function checkResult() {
 
   if (hasInvalidGroup || standardDeviation > standardDeviationLimit.value) {
     divideArrayIntoSixGroups()
+    return
+  } else {
+    groups.forEach((group, index) => {
+      group.sort((a, b) => {
+        return a.gender === b.gender ? 0 : a.gender === 'M' ? -1 : 1
+      })
+    })
   }
 }
 
@@ -231,8 +277,10 @@ sortPlayerData()
         cursor: pointer;
       }
     }
-
-    > input {
+    > div {
+      display: flex;
+      gap: 8px;
+      color: white;
     }
   }
 }
@@ -274,6 +322,7 @@ sortPlayerData()
   flex-direction: column;
   align-items: center;
   overflow-y: scroll;
+  touch-action: pan-x;
   box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.2);
   background-color: white;
   &__player-num {
@@ -301,6 +350,22 @@ sortPlayerData()
   @media (max-width: 1200px) {
     display: none;
     background-color: red;
+  }
+}
+
+.fade-in {
+  &-enter-active {
+    transition: opacity 0.5s, transform 0.5s;
+  }
+
+  &-enter-from {
+    opacity: 0;
+    transform: translateX(-100px);
+  }
+
+  &-leave-active,
+  &-leave-to {
+    transition-delay: 0s !important;
   }
 }
 </style>
