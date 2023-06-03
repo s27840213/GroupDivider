@@ -17,6 +17,7 @@ div(class="main-section")
           )
             span {{ `${player.graduation_year} ${player.name}` }}
             span(:style="{ color: player.gender === 'M' ? 'blue' : 'red' }") {{ `(${player.gender})` }}
+            span(v-if="player.group_id && showGroupId") {{ `(${player.group_id})` }}
   div(class="group-section__ctrl")
     button(@click="divideArrayIntoSixGroups()") {{ isDeviding ? `分組計算中${getAnimationDots}` : '隨機分組' }}
     div
@@ -29,8 +30,11 @@ div(class="main-section")
         step="0.01"
       )
     div
-      span 是否顯示平均分數
+      span {{ showAverageScore ? '隱藏平均分數' : '顯示平均分數' }}
       toggle-btn(v-model="showAverageScore" :width="40")
+    div
+      span {{ showGroupId ? '隱藏 GroupID' : '顯示 GroupID' }}
+      toggle-btn(v-model="showGroupId" :width="40")
 div(class="player-section")
   div(class="player-section__player-num") 未分組人數: {{ playersData.length }}
   div(v-for="player in playersData" :key="player.name" class="player-section__player")
@@ -78,6 +82,7 @@ let groups: Array<Array<IPlayer>> = reactive([])
 const standardDeviationLimit = ref(0.25)
 const isDeviding = ref(false)
 const showAverageScore = ref(false)
+const showGroupId = ref(false)
 
 const textAnimationState = ref(0)
 let textAnimationInterval = null as unknown as NodeJS.Timeout
@@ -180,8 +185,21 @@ async function divideArrayIntoSixGroups() {
 function checkResult() {
   // rule 1: every team should at least have two female players
   const hasInvalidGroup = groups.some((group) => {
-    const femaleCount = group.filter((player) => player.gender === 'F').length
-    return femaleCount < 2 || femaleCount >= 4
+    let femaleCount = 0
+    let ultraLevelCount = 0
+    let lowLevelCount = 0
+
+    group.forEach((player) => {
+      player.level === 12 && ultraLevelCount++
+      player.level === 4 && lowLevelCount++
+      player.gender === 'F' && femaleCount++
+    })
+    return (
+      femaleCount < 2 ||
+      femaleCount >= 4 ||
+      ultraLevelCount > 1 ||
+      lowLevelCount > 1
+    )
   })
 
   /**
@@ -267,6 +285,7 @@ sortPlayerData()
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    gap: 8px;
     > button {
       border: 1px solid #dadada;
       padding: 12px 24px;
