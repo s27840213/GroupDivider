@@ -181,7 +181,7 @@ function checkResult() {
   // rule 1: every team should at least have two female players
   const hasInvalidGroup = groups.some((group) => {
     const femaleCount = group.filter((player) => player.gender === 'F').length
-    return femaleCount < 2
+    return femaleCount < 2 || femaleCount >= 4
   })
 
   /**
